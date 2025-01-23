@@ -283,6 +283,109 @@ test.describe("Visual Comparison Tests", () => {
     await context.close();
   });
 
+  test("Verify broken image links automatically on staging pages from config.js", async ({
+    page,
+  }) => {
+    const stagingUrls = config.staging.urls.map(
+      (url) => `${config.staging.baseUrl}${url}`
+    );
+  
+    for (const url of stagingUrls) {
+      console.log(chalk.blue(`Navigating to: ${url}`));
+      await page.goto(url, { waitUntil: "domcontentloaded" });
+      console.log(chalk.green(`Page loaded successfully: ${url}`));
+  
+      console.log(chalk.blue("Finding all image elements on the page..."));
+      const images = await page.locator("img");
+      const imageCount = await images.count();
+      console.log(chalk.green(`Found ${imageCount} images on the page.`));
+  
+      let brokenImages = [];
+      let totalImagesChecked = 0;
+  
+      for (let i = 0; i < imageCount; i++) {
+        let imageUrl = await images.nth(i).getAttribute("src");
+  
+        if (!imageUrl) {
+          console.log(
+            chalk.yellow(`Image ${i + 1} does not have a valid src attribute.`)
+          );
+          brokenImages.push({
+            imageIndex: i + 1,
+            reason: "No valid src attribute",
+          });
+          continue;
+        }
+  
+        // Handle relative and protocol-relative URLs
+        if (!imageUrl.startsWith("http") && !imageUrl.startsWith("//")) {
+          imageUrl = new URL(imageUrl, url).toString();
+        } else if (imageUrl.startsWith("//")) {
+          imageUrl = `https:${imageUrl}`;
+        }
+  
+        try {
+          console.log(chalk.blue(`Checking image ${i + 1}: ${imageUrl}`));
+          const response = await page.request.get(imageUrl);
+  
+          if (response.status() !== 200) {
+            console.log(
+              chalk.red(
+                `Image ${i + 1} failed to load. Status Code: ${response.status()}`
+              )
+            );
+            brokenImages.push({
+              imageIndex: i + 1,
+              imageUrl: imageUrl,
+              statusCode: response.status(),
+            });
+          } else {
+            console.log(chalk.green(`Image ${i + 1} loaded successfully.`));
+          }
+        } catch (error) {
+          console.log(
+            chalk.red(
+              `Image ${i + 1} failed to load. Error: ${error.message}`
+            )
+          );
+          brokenImages.push({
+            imageIndex: i + 1,
+            imageUrl: imageUrl,
+            reason: error.message,
+          });
+        }
+  
+        totalImagesChecked++;
+      }
+  
+      console.log(chalk.blue(`Total images checked: ${totalImagesChecked}`));
+      console.log(
+        chalk.red(
+          `Broken images on ${url}: ${brokenImages.length > 0 ? brokenImages.length : "None"}`
+        )
+      );
+  
+      if (brokenImages.length > 0) {
+        console.log(chalk.red(`Broken image details for ${url}:`));
+        brokenImages.forEach((image) => {
+          console.log(
+            chalk.red(
+              `- Image ${image.imageIndex}: ${
+                image.imageUrl || "No URL available"
+              } (Reason: ${
+                image.reason || `Status Code ${image.statusCode}`
+              })`
+            )
+          );
+        });
+      } else {
+        console.log(
+          chalk.green(`No broken images found on the page: ${url}.`)
+        );
+      }
+    }
+  });
+   
   test("Fill out the form one field at a time and submit", async ({
     browser,
   }) => {
