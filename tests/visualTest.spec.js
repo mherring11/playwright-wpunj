@@ -4,19 +4,16 @@ const path = require("path");
 const { PNG } = require("pngjs");
 const sharp = require("sharp");
 const config = require("../config.js");
+const axios = require("axios");
 
 let pixelmatch;
 let chalk;
 
-// Dynamically load `pixelmatch` and `chalk`
 (async () => {
   pixelmatch = (await import("pixelmatch")).default;
   chalk = (await import("chalk")).default;
 })();
 
-// Helper Functions
-
-// Ensure directory exists
 function ensureDirectoryExistence(filePath) {
   const dirname = path.dirname(filePath);
   if (!fs.existsSync(dirname)) {
@@ -67,7 +64,6 @@ async function compareScreenshots(baselinePath, currentPath, diffPath) {
   return (matchedPixels / totalPixels) * 100;
 }
 
-// Forcefully capture screenshot for a given URL
 async function captureScreenshot(page, url, screenshotPath) {
   try {
     console.log(chalk.blue(`Navigating to: ${url}`));
